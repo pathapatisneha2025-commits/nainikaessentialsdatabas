@@ -37,14 +37,19 @@ const uploadToCloudinary = (buffer, folder = "elanproducts") => {
 ====================================================== */
 router.post("/add", upload.array("images", 5), async (req, res) => {
   try {
-    const { name, category, subcategory, price, stock } = req.body;
-
-    if (!name || !price) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+    const {
+      name,
+      category,
+      subcategory,
+      price,
+      stock,
+      is_new,
+      is_bestseller,
+      is_featured,
+    } = req.body;
 
     let imageUrls = [];
-    if (req.files && req.files.length > 0) {
+    if (req.files?.length) {
       for (const file of req.files) {
         const result = await uploadToCloudinary(file.buffer);
         imageUrls.push(result.secure_url);
@@ -52,41 +57,53 @@ router.post("/add", upload.array("images", 5), async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO elanproducts (name, category, subcategory, price, stock, images)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [name, category, subcategory, price, stock, imageUrls]
+      `INSERT INTO elanproducts 
+      (name, category, subcategory, price, stock, images, is_new, is_bestseller, is_featured)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *`,
+      [
+        name,
+        category,
+        subcategory,
+        price,
+        stock,
+        imageUrls,
+        is_new === "true",
+        is_bestseller === "true",
+        is_featured === "true",
+      ]
     );
 
-    res.json({
-      message: "Product added successfully",
-      product: result.rows[0],
-    });
+    res.json({ product: result.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
+
 /* ======================================================
    UPDATE PRODUCT (OPTIONAL IMAGE REPLACE + SUBCATEGORY)
 ====================================================== */
 router.put("/update/:id", upload.array("images", 5), async (req, res) => {
   try {
-    const { name, category, subcategory, price, stock, existingImages } = req.body;
+    const {
+      name,
+      category,
+      subcategory,
+      price,
+      stock,
+      is_new,
+      is_bestseller,
+      is_featured,
+      existingImages,
+    } = req.body;
 
-    const existing = await pool.query(
-      `SELECT images FROM elanproducts WHERE id=$1`,
-      [req.params.id]
-    );
+    let imageUrls = existingImages
+      ? JSON.parse(existingImages)
+      : [];
 
-    if (existing.rows.length === 0) {
-      return res.status(404).json({ error: "Product not found" });
-    }
-
-    let imageUrls = existingImages ? JSON.parse(existingImages) : existing.rows[0].images;
-
-    if (req.files && req.files.length > 0) {
+    if (req.files?.length) {
       for (const file of req.files) {
         const result = await uploadToCloudinary(file.buffer);
         imageUrls.push(result.secure_url);
@@ -95,21 +112,30 @@ router.put("/update/:id", upload.array("images", 5), async (req, res) => {
 
     const result = await pool.query(
       `UPDATE elanproducts
-       SET name=$1, category=$2, subcategory=$3, price=$4, stock=$5, images=$6
-       WHERE id=$7
+       SET name=$1, category=$2, subcategory=$3, price=$4, stock=$5,
+           images=$6, is_new=$7, is_bestseller=$8, is_featured=$9
+       WHERE id=$10
        RETURNING *`,
-      [name, category, subcategory, price, stock, imageUrls, req.params.id]
+      [
+        name,
+        category,
+        subcategory,
+        price,
+        stock,
+        imageUrls,
+        is_new === "true",
+        is_bestseller === "true",
+        is_featured === "true",
+        req.params.id,
+      ]
     );
 
-    res.json({
-      message: "Product updated successfully",
-      product: result.rows[0],
-    });
+    res.json({ product: result.rows[0] });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /* ======================================================
    GET ALL PRODUCTS
@@ -143,6 +169,26 @@ router.get("/:id", async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
+});
+router.get("/new", async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM elanproducts WHERE is_new=true ORDER BY created_at DESC`
+  );
+  res.json(result.rows);
+});
+
+router.get("/bestsellers", async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM elanproducts WHERE is_bestseller=true`
+  );
+  res.json(result.rows);
+});
+
+router.get("/featured", async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM elanproducts WHERE is_featured=true`
+  );
+  res.json(result.rows);
 });
 
 /* ======================================================
