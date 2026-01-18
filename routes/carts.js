@@ -18,16 +18,13 @@ router.get("/:user_id", async (req, res) => {
     }
 
     const cart = result.rows[0];
-
-    // Ensure items is parsed as an array
-    cart.items = cart.items ? JSON.parse(cart.items) : [];
+    cart.items = cart.items || []; // ensure items is always an array
     res.json(cart);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 /* ======================================================
    ADD ITEM TO CART
