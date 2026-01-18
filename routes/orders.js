@@ -5,7 +5,7 @@ const pool = require("../db");
 /* =====================================
    1️⃣ CREATE ORDER (Place Order)
 ===================================== */
-router.post("/", async (req, res) => {
+router.post("/add", async (req, res) => {
   try {
     const {
       user_id,
