@@ -17,7 +17,9 @@ router.get("/:user_id", async (req, res) => {
       return res.json({ user_id, items: [] }); // empty cart
     }
 
-    res.json(result.rows[0]);
+    const cart = result.rows[0];
+    cart.items = cart.items || []; // ensure items is always an array
+    res.json(cart);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -30,19 +32,13 @@ router.get("/:user_id", async (req, res) => {
 router.post("/add", async (req, res) => {
   try {
     const { user_id, product } = req.body;
-    /**
-     * product = {
-     *   product_id: 201,
-     *   selected_size: "M",
-     *   selected_color: "Red",
-     *   quantity: 2,
-     *   price_at_addition: 1299.99,
-     *   product_name: "Elegant Black Hoodie",
-     *   product_images: ["/images/blackhoodie1.jpeg"]
-     * }
-     */
 
-    // Check if user already has a cart
+    // Ensure product object is valid
+    if (!product?.product_id) {
+      return res.status(400).json({ error: "Invalid product data" });
+    }
+
+    // Get user's cart
     const cartRes = await pool.query(
       `SELECT * FROM elan_cart WHERE user_id=$1`,
       [user_id]
@@ -57,23 +53,20 @@ router.post("/add", async (req, res) => {
       return res.json(newCart.rows[0]);
     }
 
-    // User already has cart -> update JSONB
+    // Update existing cart
     const cart = cartRes.rows[0];
-    let items = cart.items;
+    let items = cart.items || [];
 
-    // Check if product with same size/color already exists
     const index = items.findIndex(
       (item) =>
-        item.product_id === product.product_id &&
-        item.selected_size === product.selected_size &&
-        item.selected_color === product.selected_color
+        item?.product_id === product.product_id &&
+        item?.selected_size === product.selected_size &&
+        item?.selected_color === product.selected_color
     );
 
     if (index >= 0) {
-      // Increment quantity
       items[index].quantity += product.quantity;
     } else {
-      // Add new item
       items.push(product);
     }
 
@@ -90,7 +83,7 @@ router.post("/add", async (req, res) => {
 });
 
 /* ======================================================
-   UPDATE A CART ITEM
+   UPDATE CART ITEM
 ====================================================== */
 router.patch("/update/:user_id", async (req, res) => {
   try {
@@ -106,13 +99,13 @@ router.patch("/update/:user_id", async (req, res) => {
       return res.status(404).json({ error: "Cart not found" });
     }
 
-    let items = cartRes.rows[0].items;
+    let items = cartRes.rows[0].items || [];
 
     const index = items.findIndex(
       (item) =>
-        item.product_id === product_id &&
-        item.selected_size === selected_size &&
-        item.selected_color === selected_color
+        item?.product_id === product_id &&
+        item?.selected_size === selected_size &&
+        item?.selected_color === selected_color
     );
 
     if (index === -1) {
@@ -151,15 +144,15 @@ router.delete("/remove/:user_id", async (req, res) => {
       return res.status(404).json({ error: "Cart not found" });
     }
 
-    let items = cartRes.rows[0].items;
+    let items = cartRes.rows[0].items || [];
 
     // Remove matching item
     items = items.filter(
       (item) =>
         !(
-          item.product_id === product_id &&
-          item.selected_size === selected_size &&
-          item.selected_color === selected_color
+          item?.product_id === product_id &&
+          item?.selected_size === selected_size &&
+          item?.selected_color === selected_color
         )
     );
 
