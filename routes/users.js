@@ -75,5 +75,44 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+/* ======================================================
+   GET ALL USERS
+====================================================== */
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT user_id, full_name, email, phone_number, created_at FROM elan_users`
+    );
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+/* ======================================================
+   GET USER BY ID
+====================================================== */
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT user_id, full_name, email, phone_number, created_at 
+       FROM elan_users 
+       WHERE user_id=$1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 module.exports = router;
