@@ -208,35 +208,40 @@ router.get("/:id", async (req, res) => {
   }
 });
 // Reduce product stock
+// routes/products.js
 router.post("/reduce-stock", async (req, res) => {
   try {
     const { product_id, size, color, quantity } = req.body;
 
+    // Fetch product
     const productRes = await pool.query("SELECT variants FROM elanproducts WHERE id=$1", [product_id]);
     if (!productRes.rows.length) return res.status(404).json({ error: "Product not found" });
 
-    let variants = productRes.rows[0].variants;
+    let variants = productRes.rows[0].variants; // this is already a JS array
 
     // Find the variant
     const variantIndex = variants.findIndex(v => v.size === size && v.color === color);
     if (variantIndex === -1) return res.status(404).json({ error: "Variant not found" });
 
-    if (variants[variantIndex].stock < quantity) return res.status(400).json({ error: "Not enough stock" });
+    if (variants[variantIndex].stock < quantity)
+      return res.status(400).json({ error: "Not enough stock" });
 
+    // Reduce stock
     variants[variantIndex].stock -= quantity;
 
-    // Update DB
+    // Update DB → stringify variants before sending to Postgres
     await pool.query(
       "UPDATE elanproducts SET variants=$1 WHERE id=$2",
-      [variants, product_id]
+      [JSON.stringify(variants), product_id]
     );
 
-    res.json({ success: true, variants });
+    res.json({ success: true, variant: variants[variantIndex] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 /* ======================================================
