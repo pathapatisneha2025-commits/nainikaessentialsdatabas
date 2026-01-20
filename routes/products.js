@@ -214,15 +214,20 @@ router.patch("/stock/:id", async (req, res) => {
 ====================================================== */
 router.delete("/delete/:id", async (req, res) => {
   try {
-    await pool.query(`DELETE FROM elanproducts WHERE id=$1`, [
-      req.params.id,
-    ]);
+    const id = parseInt(req.params.id); // cast to integer
+    const result = await pool.query(`DELETE FROM elanproducts WHERE id=$1`, [id]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Product not found" });
+    }
 
     res.json({ message: "Product deleted successfully" });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /* ======================================================
    SEARCH PRODUCTS
