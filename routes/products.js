@@ -35,6 +35,9 @@ const uploadToCloudinary = (buffer, folder = "elanproducts") => {
    - thumbnails
    - variants
 ====================================================== */
+/* ======================================================
+   ADD PRODUCT
+====================================================== */
 router.post(
   "/add",
   upload.fields([
@@ -77,13 +80,19 @@ router.post(
         }
       }
 
-      // Insert into DB
+      // Insert into DB (stringify JSON columns!)
       const result = await pool.query(
         `INSERT INTO elanproducts
          (name, category, main_image, thumbnails, variants)
          VALUES ($1,$2,$3,$4,$5)
          RETURNING *`,
-        [name, category, mainImageUrl, thumbnailUrls, parsedVariants]
+        [
+          name,
+          category,
+          mainImageUrl,
+          JSON.stringify(thumbnailUrls),    // ✅ stringify thumbnails
+          JSON.stringify(parsedVariants)    // ✅ stringify variants
+        ]
       );
 
       res.json({ product: result.rows[0] });
@@ -115,7 +124,17 @@ router.put(
       }
 
       // Handle thumbnails
-      let thumbnailUrls = existingThumbnails ? JSON.parse(existingThumbnails) : [];
+      let thumbnailUrls = [];
+      if (existingThumbnails) {
+        try {
+          thumbnailUrls = typeof existingThumbnails === "string"
+            ? JSON.parse(existingThumbnails)
+            : existingThumbnails;
+        } catch {
+          thumbnailUrls = [];
+        }
+      }
+
       if (req.files?.thumbnails?.length) {
         for (const file of req.files.thumbnails) {
           const result = await uploadToCloudinary(file.buffer);
@@ -123,6 +142,23 @@ router.put(
         }
       }
 
+      // Parse variants safely
+      let parsedVariants = [];
+      if (variants) {
+        try {
+          parsedVariants = typeof variants === "string" ? JSON.parse(variants) : variants;
+          parsedVariants = parsedVariants.map(v => ({
+            size: v.size || "",
+            color: v.color || "",
+            price: Number(v.price) || 0,
+            stock: Number(v.stock) || 0,
+          }));
+        } catch {
+          parsedVariants = [];
+        }
+      }
+
+      // Update DB (stringify JSON columns!)
       const result = await pool.query(
         `UPDATE elanproducts
          SET name=$1, category=$2, main_image=$3, thumbnails=$4, variants=$5,
@@ -133,9 +169,9 @@ router.put(
           name,
           category,
           mainImageUrl,
-          thumbnailUrls,
-          variants ? JSON.parse(variants) : [],
-          req.params.id,
+          JSON.stringify(thumbnailUrls),    // ✅ stringify
+          JSON.stringify(parsedVariants),   // ✅ stringify
+          req.params.id
         ]
       );
 
