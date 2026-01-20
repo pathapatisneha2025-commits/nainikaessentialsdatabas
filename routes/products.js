@@ -208,7 +208,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 // Reduce product stock
-app.post("/products/reduce-stock", async (req, res) => {
+router.post("/products/reduce-stock", async (req, res) => {
   try {
     const { product_id, quantity } = req.body;
 
