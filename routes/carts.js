@@ -25,6 +25,18 @@ router.get("/:user_id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+/* ======================================================
+   GET ALL CARTS
+====================================================== */
+router.get("/all", async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM elan_cart`);
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 /* ======================================================
    ADD ITEM TO CART
