@@ -167,5 +167,37 @@ router.delete("/remove/:user_id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+/* ======================================================
+   REMOVE ITEM FROM CART BY PRODUCT ID ONLY
+====================================================== */
+router.delete("/remove/:user_id/:product_id", async (req, res) => {
+  try {
+    const { user_id, product_id } = req.params; // get both from URL
+
+    const cartRes = await pool.query(
+      `SELECT * FROM elan_cart WHERE user_id=$1`,
+      [user_id]
+    );
+
+    if (cartRes.rows.length === 0) {
+      return res.status(404).json({ error: "Cart not found" });
+    }
+
+    let items = cartRes.rows[0].items || [];
+
+    // Remove all items that match product_id (ignore size/color)
+    items = items.filter(item => item?.product_id !== parseInt(product_id));
+
+    const updatedCart = await pool.query(
+      `UPDATE elan_cart SET items=$1 WHERE user_id=$2 RETURNING *`,
+      [JSON.stringify(items), user_id]
+    );
+
+    res.json(updatedCart.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 module.exports = router;
