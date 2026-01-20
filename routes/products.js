@@ -61,19 +61,29 @@ router.post(
         }
       }
 
-      // Save product in DB
+      // Parse variants safely
+      let parsedVariants = [];
+      if (variants) {
+        try {
+          parsedVariants = typeof variants === "string" ? JSON.parse(variants) : variants;
+          parsedVariants = parsedVariants.map(v => ({
+            size: v.size || "",
+            color: v.color || "",
+            price: Number(v.price) || 0,
+            stock: Number(v.stock) || 0,
+          }));
+        } catch (err) {
+          parsedVariants = [];
+        }
+      }
+
+      // Insert into DB
       const result = await pool.query(
         `INSERT INTO elanproducts
-        (name, category, main_image, thumbnails, variants)
-        VALUES ($1,$2,$3,$4,$5)
-        RETURNING *`,
-        [
-          name,
-          category,
-          mainImageUrl,
-          thumbnailUrls,
-          variants ? JSON.parse(variants) : [],
-        ]
+         (name, category, main_image, thumbnails, variants)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING *`,
+        [name, category, mainImageUrl, thumbnailUrls, parsedVariants]
       );
 
       res.json({ product: result.rows[0] });
