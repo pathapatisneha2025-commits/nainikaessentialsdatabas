@@ -210,33 +210,34 @@ router.get("/:id", async (req, res) => {
 // Reduce product stock
 router.post("/reduce-stock", async (req, res) => {
   try {
-    const { product_id, quantity } = req.body;
+    const { product_id, size, color, quantity } = req.body;
 
-    // Fetch current stock
-    const product = await pool.query(
-      "SELECT stock FROM elanproducts WHERE id=$1",
-      [product_id]
-    );
+    const productRes = await pool.query("SELECT variants FROM elanproducts WHERE id=$1", [product_id]);
+    if (!productRes.rows.length) return res.status(404).json({ error: "Product not found" });
 
-    if (product.rows.length === 0) return res.status(404).json({ error: "Product not found" });
+    let variants = productRes.rows[0].variants;
 
-    const currentStock = product.rows[0].stock;
-    if (currentStock < quantity) return res.status(400).json({ error: "Not enough stock" });
+    // Find the variant
+    const variantIndex = variants.findIndex(v => v.size === size && v.color === color);
+    if (variantIndex === -1) return res.status(404).json({ error: "Variant not found" });
 
-    const newStock = currentStock - quantity;
+    if (variants[variantIndex].stock < quantity) return res.status(400).json({ error: "Not enough stock" });
 
-    // Update stock
+    variants[variantIndex].stock -= quantity;
+
+    // Update DB
     await pool.query(
-      "UPDATE elanproducts SET stock=$1 WHERE id=$2",
-      [newStock, product_id]
+      "UPDATE elanproducts SET variants=$1 WHERE id=$2",
+      [variants, product_id]
     );
 
-    res.json({ success: true, newStock });
+    res.json({ success: true, variants });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 /* ======================================================
    DELETE PRODUCT
