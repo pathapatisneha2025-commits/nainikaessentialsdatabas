@@ -212,10 +212,18 @@ router.patch("/stock/:id", async (req, res) => {
 /* ======================================================
    DELETE PRODUCT
 ====================================================== */
+// DELETE /delete/:id
 router.delete("/delete/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id); // cast to integer
-    const result = await pool.query(`DELETE FROM elanproducts WHERE id=$1`, [id]);
+    const id = parseInt(req.params.id); // ensure it's an integer
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid product ID" });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM elanproducts WHERE id = $1`,
+      [id]
+    );
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Product not found" });
