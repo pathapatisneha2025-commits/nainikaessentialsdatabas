@@ -207,6 +207,36 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+// Reduce product stock
+app.post("/products/reduce-stock", async (req, res) => {
+  try {
+    const { product_id, quantity } = req.body;
+
+    // Fetch current stock
+    const product = await pool.query(
+      "SELECT stock FROM elanproducts WHERE id=$1",
+      [product_id]
+    );
+
+    if (product.rows.length === 0) return res.status(404).json({ error: "Product not found" });
+
+    const currentStock = product.rows[0].stock;
+    if (currentStock < quantity) return res.status(400).json({ error: "Not enough stock" });
+
+    const newStock = currentStock - quantity;
+
+    // Update stock
+    await pool.query(
+      "UPDATE elanproducts SET stock=$1 WHERE id=$2",
+      [newStock, product_id]
+    );
+
+    res.json({ success: true, newStock });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 /* ======================================================
    DELETE PRODUCT
