@@ -5,6 +5,7 @@ const CartRoutes = require("./routes/carts");
 const UserRoutes = require("./routes/users");
 const OrdersRoutes = require("./routes/orders");
 const couponsRoutes = require("./routes/coupons");
+const codRoutes = require("./routes/cod");
 
 
 
@@ -18,6 +19,7 @@ app.use("/carts", CartRoutes);
 app.use("/users", UserRoutes);
 app.use("/orders",OrdersRoutes);
 app.use("/coupons",couponsRoutes);
+app.use("/cod",codRoutes);
 
 
 // Test Route
