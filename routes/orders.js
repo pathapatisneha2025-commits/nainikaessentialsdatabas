@@ -151,7 +151,7 @@ router.post("/:id/ship", async (req, res) => {
     const courierService = "Shiprocket";
 
     const updatedOrder = await db.query(
-      `UPDATE orders
+      `UPDATE elan_orders
        SET shipping_status = 'Shipped',
            tracking_number = $1,
            courier_service = $2
