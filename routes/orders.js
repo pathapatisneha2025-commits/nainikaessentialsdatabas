@@ -257,33 +257,42 @@ router.post("/:orderId/return", async (req, res) => {
   const { orderId } = req.params;
   const { product_ids, reason } = req.body;
 
-  // 1. Fetch the order
-  const orderResult = await pool.query(
-    "SELECT items FROM elan_orders WHERE order_id = $1",
-    [orderId]
-  );
+  try {
+    const orderResult = await pool.query(
+      "SELECT items FROM elan_orders WHERE order_id = $1",
+      [orderId]
+    );
 
-  if (!orderResult.rows.length)
-    return res.status(404).json({ success: false, message: "Order not found" });
+    if (!orderResult.rows.length)
+      return res.status(404).json({ success: false, message: "Order not found" });
 
-  let items = orderResult.rows[0].items;
-  if (typeof items === "string") items = JSON.parse(items);
+    let items = orderResult.rows[0].items;
 
-  // 2. Update the requested products
-  items = items.map(item =>
-    product_ids.includes(item.product_id)
-      ? { ...item, return_status: "Requested", return_reason: reason }
-      : item
-  );
+    // Ensure items is an array
+    if (typeof items === "string") items = JSON.parse(items);
 
-  // 3. Update DB
-  await pool.query(
-    "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
-    [JSON.stringify(items), orderId]
-  );
+    // Make sure product_id types match
+    const productIds = product_ids.map(id => Number(id));
 
-  res.json({ success: true, message: "Return requested successfully" });
+    items = items.map(item =>
+      productIds.includes(Number(item.product_id))
+        ? { ...item, return_status: "Requested", return_reason: reason }
+        : item
+    );
+
+    // Update DB using JSONB
+    await pool.query(
+      "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
+      [items, orderId] // pass JS object, pg will handle JSON
+    );
+
+    res.json({ success: true, message: "Return requested successfully", items });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
+
 
 
 // GET ALL RETURN REQUESTS (Admin)
