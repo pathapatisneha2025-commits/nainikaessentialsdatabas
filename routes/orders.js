@@ -181,4 +181,47 @@ router.delete("/:order_id", async (req, res) => {
   }
 });
 
+
+router.get("/sales", async (req, res) => {
+  try {
+    // 1️⃣ Fetch all products
+    const productsRes = await pool.query(`SELECT id, name, category FROM elanproducts`);
+    const products = productsRes.rows;
+
+    // 2️⃣ Fetch all orders
+    const ordersRes = await pool.query(`SELECT items FROM elan_orders`);
+    const orders = ordersRes.rows;
+
+    // 3️⃣ Aggregate total sold per product
+    const salesMap = {}; // { product_id: totalSold }
+
+    orders.forEach((order) => {
+      const items = order.items; // items is expected to be an array
+      if (!items) return;
+      items.forEach((item) => {
+        const { product_id, quantity } = item;
+        if (!salesMap[product_id]) salesMap[product_id] = 0;
+        salesMap[product_id] += quantity;
+      });
+    });
+
+    // 4️⃣ Merge sales into products
+    const productsWithSales = products.map((p) => ({
+      ...p,
+      totalSold: salesMap[p.id] || 0,
+    }));
+
+    // 5️⃣ Sort products descending by totalSold
+    productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
+
+    res.json({
+      highestSelling: productsWithSales[0] || null,
+      lowestSelling: productsWithSales[productsWithSales.length - 1] || null,
+      allProducts: productsWithSales,
+    });
+  } catch (err) {
+    console.error("Sales report error:", err);
+    res.status(500).json({ error: "Failed to generate sales report" });
+  }
+});
 module.exports = router;
