@@ -142,6 +142,25 @@ router.put("/:order_id", async (req, res) => {
     res.status(500).json({ error: "Failed to update order" });
   }
 });
+router.post("/:id/ship", async (req, res) => {
+  const orderId = req.params.id;
+
+  // Simulate courier API integration
+  const trackingNumber = "TRK" + Math.floor(Math.random() * 1000000);
+  const courierService = "Shiprocket";
+
+  const updatedOrder = await db.query(
+    `UPDATE orders
+     SET shipping_status = 'Shipped',
+         tracking_number = $1,
+         courier_service = $2
+     WHERE order_id = $3
+     RETURNING *`,
+    [trackingNumber, courierService, orderId]
+  );
+
+  res.json(updatedOrder.rows[0]);
+});
 
 /* =====================================
    7️⃣ DELETE ORDER (Admin)
