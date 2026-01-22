@@ -253,46 +253,38 @@ router.get("/sales", async (req, res) => {
   }
 });
 // REQUEST RETURN (User)
-router.post("/:order_id/return", async (req, res) => {
-  const { order_id } = req.params;
+router.post("/:orderId/return", async (req, res) => {
+  const { orderId } = req.params;
   const { product_ids, reason } = req.body;
 
-  if (!product_ids?.length) {
-    return res.status(400).json({ success: false, message: "No products selected" });
-  }
+  // 1. Fetch the order
+  const orderResult = await pool.query(
+    "SELECT items FROM elan_orders WHERE order_id = $1",
+    [orderId]
+  );
 
-  try {
-    const orderResult = await pool.query(
-      "SELECT items FROM elan_orders WHERE order_id = $1",
-      [order_id]
-    );
+  if (!orderResult.rows.length)
+    return res.status(404).json({ success: false, message: "Order not found" });
 
-    if (!orderResult.rows.length) {
-      return res.status(404).json({ success: false, message: "Order not found" });
-    }
+  let items = orderResult.rows[0].items;
+  if (typeof items === "string") items = JSON.parse(items);
 
-    // Ensure items is an array
-    let items = orderResult.rows[0].items;
-    if (typeof items === "string") items = JSON.parse(items);
+  // 2. Update the requested products
+  items = items.map(item =>
+    product_ids.includes(item.product_id)
+      ? { ...item, return_status: "Requested", return_reason: reason }
+      : item
+  );
 
-    // Update the products requested for return
-    items = items.map(item =>
-      product_ids.includes(item.id)
-        ? { ...item, return_status: "Requested", return_reason: reason }
-        : item
-    );
+  // 3. Update DB
+  await pool.query(
+    "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
+    [JSON.stringify(items), orderId]
+  );
 
-    await pool.query(
-      "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
-      [JSON.stringify(items), order_id]
-    );
-
-    res.json({ success: true, message: "Return requested successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
+  res.json({ success: true, message: "Return requested successfully" });
 });
+
 
 // GET ALL RETURN REQUESTS (Admin)
 router.get("/admin/returns", async (req, res) => {
