@@ -192,42 +192,44 @@ router.get("/sales", async (req, res) => {
     const ordersRes = await pool.query(`SELECT items FROM elan_orders`);
     const orders = ordersRes.rows;
 
-    // 3️⃣ Aggregate total sold per product
-    const salesMap = {}; // { product_id: totalSold }
+    // 3️⃣ Aggregate total sold and revenue per product
+    const salesMap = {};   // { product_id: totalSold }
+    const revenueMap = {}; // { product_id: totalRevenue }
 
     orders.forEach((order) => {
-      if (!order.items) return;
-
-      // Parse items JSON safely
+      // Ensure items is always an array
       let items = [];
-      try {
-        items = Array.isArray(order.items)
-          ? order.items
-          : typeof order.items === "string"
-          ? JSON.parse(order.items)
-          : [];
-      } catch (err) {
-        console.error("Failed to parse order items:", err);
-        return;
+      if (Array.isArray(order.items)) items = order.items;
+      else if (typeof order.items === "string") {
+        try {
+          items = JSON.parse(order.items);
+          if (!Array.isArray(items)) items = [];
+        } catch {
+          items = [];
+        }
       }
 
       items.forEach((item) => {
-        const productId = Number(item.product_id);
-        const quantity = Number(item.quantity) || 0;
+        const pid = Number(item.product_id);
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.price) || 0;
 
-        if (!productId) return; // skip invalid product_id
-        if (!salesMap[productId]) salesMap[productId] = 0;
-        salesMap[productId] += quantity;
+        if (!salesMap[pid]) salesMap[pid] = 0;
+        salesMap[pid] += qty;
+
+        if (!revenueMap[pid]) revenueMap[pid] = 0;
+        revenueMap[pid] += qty * price;
       });
     });
 
-    // 4️⃣ Merge sales into products
+    // 4️⃣ Merge sales and revenue into products
     const productsWithSales = products.map((p) => ({
       ...p,
       totalSold: salesMap[p.id] || 0,
+      totalRevenue: revenueMap[p.id] || 0,
     }));
 
-    // 5️⃣ Sort descending by totalSold
+    // 5️⃣ Sort products descending by totalSold
     productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
 
     res.json({
@@ -240,5 +242,6 @@ router.get("/sales", async (req, res) => {
     res.status(500).json({ error: "Failed to generate sales report" });
   }
 });
+
 
 module.exports = router;
