@@ -143,24 +143,34 @@ router.put("/:order_id", async (req, res) => {
   }
 });
 router.post("/:id/ship", async (req, res) => {
-  const orderId = req.params.id;
+  const orderId = Number(req.params.id); // ensure it's a number
 
-  // Simulate courier API integration
-  const trackingNumber = "TRK" + Math.floor(Math.random() * 1000000);
-  const courierService = "Shiprocket";
+  try {
+    // Simulate courier API integration
+    const trackingNumber = "TRK" + Math.floor(Math.random() * 1000000);
+    const courierService = "Shiprocket";
 
-  const updatedOrder = await db.query(
-    `UPDATE orders
-     SET shipping_status = 'Shipped',
-         tracking_number = $1,
-         courier_service = $2
-     WHERE order_id = $3
-     RETURNING *`,
-    [trackingNumber, courierService, orderId]
-  );
+    const updatedOrder = await db.query(
+      `UPDATE orders
+       SET shipping_status = 'Shipped',
+           tracking_number = $1,
+           courier_service = $2
+       WHERE order_id = $3
+       RETURNING *`,
+      [trackingNumber, courierService, orderId]
+    );
 
-  res.json(updatedOrder.rows[0]);
+    if (!updatedOrder.rows[0]) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    res.json(updatedOrder.rows[0]);
+  } catch (err) {
+    console.error("Ship order error:", err);
+    res.status(500).json({ error: "Failed to create shipment" });
+  }
 });
+
 
 /* =====================================
    7️⃣ DELETE ORDER (Admin)
