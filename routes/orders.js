@@ -196,12 +196,28 @@ router.get("/sales", async (req, res) => {
     const salesMap = {}; // { product_id: totalSold }
 
     orders.forEach((order) => {
-      const items = order.items; // items is expected to be an array
-      if (!items) return;
+      if (!order.items) return;
+
+      // Parse items JSON safely
+      let items = [];
+      try {
+        items = Array.isArray(order.items)
+          ? order.items
+          : typeof order.items === "string"
+          ? JSON.parse(order.items)
+          : [];
+      } catch (err) {
+        console.error("Failed to parse order items:", err);
+        return;
+      }
+
       items.forEach((item) => {
-        const { product_id, quantity } = item;
-        if (!salesMap[product_id]) salesMap[product_id] = 0;
-        salesMap[product_id] += quantity;
+        const productId = Number(item.product_id);
+        const quantity = Number(item.quantity) || 0;
+
+        if (!productId) return; // skip invalid product_id
+        if (!salesMap[productId]) salesMap[productId] = 0;
+        salesMap[productId] += quantity;
       });
     });
 
@@ -211,7 +227,7 @@ router.get("/sales", async (req, res) => {
       totalSold: salesMap[p.id] || 0,
     }));
 
-    // 5️⃣ Sort products descending by totalSold
+    // 5️⃣ Sort descending by totalSold
     productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
 
     res.json({
@@ -224,4 +240,5 @@ router.get("/sales", async (req, res) => {
     res.status(500).json({ error: "Failed to generate sales report" });
   }
 });
+
 module.exports = router;
