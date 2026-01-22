@@ -256,7 +256,10 @@ router.post("/:order_id/return", async (req, res) => {
   const { order_id } = req.params;
   const { product_ids, reason } = req.body;
 
-  if (!product_ids?.length) return res.status(400).json({ success: false, message: "No products selected" });
+  if (!product_ids?.length)
+    return res
+      .status(400)
+      .json({ success: false, message: "No products selected" });
 
   try {
     const orderResult = await pool.query(
@@ -264,19 +267,26 @@ router.post("/:order_id/return", async (req, res) => {
       [order_id]
     );
 
-    if (!orderResult.rows.length) return res.status(404).json({ success: false, message: "Order not found" });
+    if (!orderResult.rows.length)
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
 
     let items = orderResult.rows[0].items;
 
-    items = items.map(item =>
+    // Make sure items is parsed if it's a string
+    if (typeof items === "string") items = JSON.parse(items);
+
+    items = items.map((item) =>
       product_ids.includes(item.id)
         ? { ...item, return_status: "Requested", return_reason: reason }
         : item
     );
 
+    // Convert back to JSON string before storing
     await pool.query(
       "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
-      [items, order_id]
+      [JSON.stringify(items), order_id]
     );
 
     res.json({ success: true, message: "Return requested successfully" });
@@ -285,6 +295,7 @@ router.post("/:order_id/return", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 router.get("/admin/returns", async (req, res) => {
   try {
     const result = await pool.query(
