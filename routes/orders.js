@@ -310,13 +310,14 @@ router.get("/admin/returns", async (req, res) => {
 // APPROVE / REJECT RETURN (Admin)
 router.post("/admin/returns/:order_id", async (req, res) => {
   const { order_id } = req.params;
-  const { product_id, action } = req.body; // action = "approve" | "reject"
+  const { action } = req.body; // action = "approve" | "reject"
 
   if (!["approve", "reject"].includes(action)) {
     return res.status(400).json({ success: false, message: "Invalid action" });
   }
 
   try {
+    // Get order items
     const orderResult = await pool.query(
       "SELECT items FROM elan_orders WHERE order_id = $1",
       [order_id]
@@ -329,19 +330,22 @@ router.post("/admin/returns/:order_id", async (req, res) => {
     let items = orderResult.rows[0].items;
     if (typeof items === "string") items = JSON.parse(items);
 
-    // Update the return_status for the targeted product
-    items = items.map(item =>
-      item.id === product_id
-        ? { ...item, return_status: action === "approve" ? "Approved" : "Rejected" }
-        : item
-    );
+    // Update return_status for all items
+    items = items.map(item => ({
+      ...item,
+      return_status: action === "approve" ? "Approved" : "Rejected"
+    }));
 
+    // Update the order in database
     await pool.query(
       "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
       [JSON.stringify(items), order_id]
     );
 
-    res.json({ success: true, message: `Return ${action}d successfully` });
+    res.json({
+      success: true,
+      message: `All returns in Order #${order_id} have been ${action}d successfully`
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
