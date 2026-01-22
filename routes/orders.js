@@ -255,9 +255,10 @@ router.get("/sales", async (req, res) => {
 // REQUEST RETURN (User)
 router.post("/:orderId/return", async (req, res) => {
   const { orderId } = req.params;
-  const { product_ids, reason } = req.body;
+  const { reason } = req.body; // no product_ids needed
 
   try {
+    // Fetch the order
     const orderResult = await pool.query(
       "SELECT items FROM elan_orders WHERE order_id = $1",
       [orderId]
@@ -271,22 +272,20 @@ router.post("/:orderId/return", async (req, res) => {
     // Ensure items is an array
     if (typeof items === "string") items = JSON.parse(items);
 
-    // Make sure product_id types match
-    const productIds = product_ids.map(id => Number(id));
+    // Update all items in the order
+    items = items.map(item => ({
+      ...item,
+      return_status: "Requested",
+      return_reason: reason
+    }));
 
-    items = items.map(item =>
-      productIds.includes(Number(item.product_id))
-        ? { ...item, return_status: "Requested", return_reason: reason }
-        : item
-    );
-
-    // Update DB using JSONB
+    // Update DB
     await pool.query(
       "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
-      [items, orderId] // pass JS object, pg will handle JSON
+      [JSON.stringify(items), orderId]
     );
 
-    res.json({ success: true, message: "Return requested successfully", items });
+    res.json({ success: true, message: "Return requested for entire order", items });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
