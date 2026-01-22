@@ -150,7 +150,7 @@ router.post("/:id/ship", async (req, res) => {
     const trackingNumber = "TRK" + Math.floor(Math.random() * 1000000);
     const courierService = "Shiprocket";
 
-    const updatedOrder = await db.query(
+    const updatedOrder = await pool.query(
       `UPDATE elan_orders
        SET shipping_status = 'Shipped',
            tracking_number = $1,
