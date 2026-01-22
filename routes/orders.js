@@ -184,20 +184,21 @@ router.delete("/:order_id", async (req, res) => {
 
 router.get("/sales", async (req, res) => {
   try {
-    // 1️⃣ Fetch all products
-    const productsRes = await pool.query(`SELECT id, name, category FROM elanproducts`);
+    // Fetch all products including variants
+    const productsRes = await pool.query(
+      `SELECT id, name, category, variants FROM elanproducts`
+    );
     const products = productsRes.rows;
 
-    // 2️⃣ Fetch all orders
+    // Fetch all orders
     const ordersRes = await pool.query(`SELECT items FROM elan_orders`);
     const orders = ordersRes.rows;
 
-    // 3️⃣ Aggregate total sold and revenue per product
-    const salesMap = {};   // { product_id: totalSold }
-    const revenueMap = {}; // { product_id: totalRevenue }
+    // Aggregate total sold and revenue per product
+    const salesMap = {};
+    const revenueMap = {};
 
     orders.forEach((order) => {
-      // Ensure items is always an array
       let items = [];
       if (Array.isArray(order.items)) items = order.items;
       else if (typeof order.items === "string") {
@@ -222,20 +223,19 @@ router.get("/sales", async (req, res) => {
       });
     });
 
-    // 4️⃣ Merge sales and revenue into products
     const productsWithSales = products.map((p) => ({
       ...p,
       totalSold: salesMap[p.id] || 0,
       totalRevenue: revenueMap[p.id] || 0,
     }));
 
-    // 5️⃣ Sort products descending by totalSold
+    // Sort by totalSold descending
     productsWithSales.sort((a, b) => b.totalSold - a.totalSold);
 
     res.json({
       highestSelling: productsWithSales[0] || null,
       lowestSelling: productsWithSales[productsWithSales.length - 1] || null,
-      allProducts: productsWithSales,
+      allProducts: productsWithSales || [],
     });
   } catch (err) {
     console.error("Sales report error:", err);
