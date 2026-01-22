@@ -269,10 +269,9 @@ router.post("/:orderId/return", async (req, res) => {
 
     let items = orderResult.rows[0].items;
 
-    // Ensure items is an array
     if (typeof items === "string") items = JSON.parse(items);
 
-    // Update all items in the order
+    // Update all items
     items = items.map(item => ({
       ...item,
       return_status: "Requested",
@@ -297,6 +296,7 @@ router.post("/:orderId/return", async (req, res) => {
 // GET ALL RETURN REQUESTS (Admin)
 router.get("/admin/returns", async (req, res) => {
   try {
+    // Fetch orders where any item has return_status = 'Requested'
     const result = await pool.query(
       "SELECT * FROM elan_orders WHERE items::jsonb @> '[{\"return_status\":\"Requested\"}]'"
     );
@@ -306,6 +306,7 @@ router.get("/admin/returns", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 // APPROVE / REJECT RETURN (Admin)
 router.post("/admin/returns/:order_id", async (req, res) => {
@@ -317,7 +318,7 @@ router.post("/admin/returns/:order_id", async (req, res) => {
   }
 
   try {
-    // Get order items
+    // Fetch the order
     const orderResult = await pool.query(
       "SELECT items FROM elan_orders WHERE order_id = $1",
       [order_id]
@@ -336,7 +337,7 @@ router.post("/admin/returns/:order_id", async (req, res) => {
       return_status: action === "approve" ? "Approved" : "Rejected"
     }));
 
-    // Update the order in database
+    // Update DB
     await pool.query(
       "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
       [JSON.stringify(items), order_id]
@@ -351,6 +352,7 @@ router.post("/admin/returns/:order_id", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 
 
