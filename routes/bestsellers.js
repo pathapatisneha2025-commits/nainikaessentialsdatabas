@@ -204,4 +204,28 @@ router.post("/reduce-stock", async (req, res) => {
   }
 });
 
+/* ----------------- ADD REVIEW ----------------- */
+router.post("/:id/review", async (req, res) => {
+  try {
+    const { name, rating, comment } = req.body;
+    if (!name || !rating || !comment) 
+      return res.status(400).json({ error: "All fields are required" });
+
+    // Fetch existing reviews
+    const result = await pool.query("SELECT reviews FROM elan_bestsellers WHERE id=$1", [req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ error: "Best seller not found" });
+
+    let reviews = result.rows[0].reviews || [];
+    reviews.push({ name, rating: Number(rating), comment, date: new Date() });
+
+    // Update the product with new review
+    await pool.query("UPDATE elan_bestsellers SET reviews=$1 WHERE id=$2", [JSON.stringify(reviews), req.params.id]);
+
+    res.json({ success: true, review: { name, rating: Number(rating), comment, date: new Date() } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 module.exports = router;
