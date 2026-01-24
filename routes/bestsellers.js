@@ -29,7 +29,7 @@ const uploadToCloudinary = (buffer, folder = "elanbestsellers") => {
   });
 };
 
-/* ----------------- ADD BEST SELLER ----------------- */
+/* ----------------- ADD PRODUCT ----------------- */
 router.post(
   "/add",
   upload.fields([
@@ -38,7 +38,7 @@ router.post(
   ]),
   async (req, res) => {
     try {
-      const { name, category, description, variants } = req.body;
+      const { name, category, description, variants, type } = req.body;
 
       // main image
       let mainImageUrl = null;
@@ -70,13 +70,21 @@ router.post(
 
       const result = await pool.query(
         `INSERT INTO elan_bestsellers
-         (name, category, description, main_image, thumbnails, variants)
-         VALUES ($1,$2,$3,$4,$5,$6)
+         (name, category, description, main_image, thumbnails, variants, type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
          RETURNING *`,
-        [name, category, description, mainImageUrl, JSON.stringify(thumbnailUrls), JSON.stringify(parsedVariants)]
+        [
+          name,
+          category,
+          description,
+          mainImageUrl,
+          JSON.stringify(thumbnailUrls),
+          JSON.stringify(parsedVariants),
+          type || "bestseller" // default to bestseller
+        ]
       );
 
-      res.json({ bestseller: result.rows[0] });
+      res.json({ product: result.rows[0] });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Server error" });
@@ -84,7 +92,7 @@ router.post(
   }
 );
 
-/* ----------------- UPDATE BEST SELLER ----------------- */
+/* ----------------- UPDATE PRODUCT ----------------- */
 router.put(
   "/update/:id",
   upload.fields([
@@ -93,7 +101,7 @@ router.put(
   ]),
   async (req, res) => {
     try {
-      const { name, category, description, variants, existingMainImage, existingThumbnails } = req.body;
+      const { name, category, description, variants, existingMainImage, existingThumbnails, type } = req.body;
 
       let mainImageUrl = existingMainImage || null;
       if (req.files?.mainImage?.length) {
@@ -126,14 +134,23 @@ router.put(
 
       const result = await pool.query(
         `UPDATE elan_bestsellers
-         SET name=$1, category=$2, description=$3, main_image=$4, thumbnails=$5, variants=$6,
+         SET name=$1, category=$2, description=$3, main_image=$4, thumbnails=$5, variants=$6, type=$7,
              updated_at=CURRENT_TIMESTAMP
-         WHERE id=$7
+         WHERE id=$8
          RETURNING *`,
-        [name, category, description, mainImageUrl, JSON.stringify(thumbnailUrls), JSON.stringify(parsedVariants), req.params.id]
+        [
+          name,
+          category,
+          description,
+          mainImageUrl,
+          JSON.stringify(thumbnailUrls),
+          JSON.stringify(parsedVariants),
+          type || "bestseller",
+          req.params.id
+        ]
       );
 
-      res.json({ bestseller: result.rows[0] });
+      res.json({ product: result.rows[0] });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Server error" });
@@ -141,10 +158,19 @@ router.put(
   }
 );
 
-/* ----------------- GET ALL BEST SELLERS ----------------- */
+/* ----------------- GET ALL PRODUCTS (OPTIONAL FILTER BY TYPE) ----------------- */
 router.get("/all", async (req, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM elan_bestsellers ORDER BY id DESC`);
+    const { type } = req.query; // ?type=bestseller/featured/newarrival
+    let query = "SELECT * FROM elan_bestsellers";
+    const params = [];
+    if (type) {
+      query += " WHERE type=$1";
+      params.push(type);
+    }
+    query += " ORDER BY id DESC";
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -152,11 +178,11 @@ router.get("/all", async (req, res) => {
   }
 });
 
-/* ----------------- GET BEST SELLER BY ID ----------------- */
+/* ----------------- GET PRODUCT BY ID ----------------- */
 router.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(`SELECT * FROM elan_bestsellers WHERE id=$1`, [req.params.id]);
-    if (!result.rows.length) return res.status(404).json({ error: "Best seller not found" });
+    if (!result.rows.length) return res.status(404).json({ error: "Product not found" });
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -164,12 +190,12 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/* ----------------- DELETE BEST SELLER ----------------- */
+/* ----------------- DELETE PRODUCT ----------------- */
 router.delete("/delete/:id", async (req, res) => {
   try {
     const result = await pool.query(`DELETE FROM elan_bestsellers WHERE id=$1`, [req.params.id]);
-    if (!result.rowCount) return res.status(404).json({ error: "Best seller not found" });
-    res.json({ message: "Best seller deleted successfully" });
+    if (!result.rowCount) return res.status(404).json({ error: "Product not found" });
+    res.json({ message: "Product deleted successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
@@ -179,11 +205,11 @@ router.delete("/delete/:id", async (req, res) => {
 /* ----------------- REDUCE STOCK ----------------- */
 router.post("/reduce-stock", async (req, res) => {
   try {
-    const { bestseller_id, size, color, quantity } = req.body;
+    const { product_id, size, color, quantity } = req.body;
 
-    // Fetch bestseller
-    const bRes = await pool.query("SELECT variants FROM elan_bestsellers WHERE id=$1", [bestseller_id]);
-    if (!bRes.rows.length) return res.status(404).json({ error: "Best seller not found" });
+    // Fetch product
+    const bRes = await pool.query("SELECT variants FROM elan_bestsellers WHERE id=$1", [product_id]);
+    if (!bRes.rows.length) return res.status(404).json({ error: "Product not found" });
 
     let variants = bRes.rows[0].variants;
 
@@ -195,7 +221,7 @@ router.post("/reduce-stock", async (req, res) => {
 
     variants[variantIndex].stock -= quantity;
 
-    await pool.query("UPDATE elan_bestsellers SET variants=$1 WHERE id=$2", [JSON.stringify(variants), bestseller_id]);
+    await pool.query("UPDATE elan_bestsellers SET variants=$1 WHERE id=$2", [JSON.stringify(variants), product_id]);
 
     res.json({ success: true, variant: variants[variantIndex] });
   } catch (err) {
@@ -211,14 +237,12 @@ router.post("/:id/review", async (req, res) => {
     if (!name || !rating || !comment) 
       return res.status(400).json({ error: "All fields are required" });
 
-    // Fetch existing reviews
     const result = await pool.query("SELECT reviews FROM elan_bestsellers WHERE id=$1", [req.params.id]);
-    if (!result.rows.length) return res.status(404).json({ error: "Best seller not found" });
+    if (!result.rows.length) return res.status(404).json({ error: "Product not found" });
 
     let reviews = result.rows[0].reviews || [];
     reviews.push({ name, rating: Number(rating), comment, date: new Date() });
 
-    // Update the product with new review
     await pool.query("UPDATE elan_bestsellers SET reviews=$1 WHERE id=$2", [JSON.stringify(reviews), req.params.id]);
 
     res.json({ success: true, review: { name, rating: Number(rating), comment, date: new Date() } });
@@ -227,25 +251,17 @@ router.post("/:id/review", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 /* ----------------- GET ALL REVIEWS FOR A PRODUCT ----------------- */
 router.get("/:id/reviews", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT reviews FROM elan_bestsellers WHERE id=$1",
-      [req.params.id]
-    );
-
-    if (!result.rows.length) {
-      return res.status(404).json({ error: "Best seller not found" });
-    }
-
-    // Return only reviews array
+    const result = await pool.query("SELECT reviews FROM elan_bestsellers WHERE id=$1", [req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ error: "Product not found" });
     res.json(result.rows[0].reviews || []);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Server error" });
   }
 });
-
 
 module.exports = router;
