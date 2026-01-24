@@ -227,5 +227,25 @@ router.post("/:id/review", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+/* ----------------- GET ALL REVIEWS FOR A PRODUCT ----------------- */
+router.get("/:id/reviews", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT reviews FROM elan_bestsellers WHERE id=$1",
+      [req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Best seller not found" });
+    }
+
+    // Return only reviews array
+    res.json(result.rows[0].reviews || []);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 module.exports = router;
