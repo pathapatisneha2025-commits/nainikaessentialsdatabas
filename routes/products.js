@@ -46,7 +46,7 @@ router.post(
   ]),
   async (req, res) => {
     try {
-      const { name, category, variants } = req.body;
+      const { name, category, variants, discount } = req.body; // ✅ add discount
 
       // Upload main image
       let mainImageUrl = null;
@@ -64,7 +64,7 @@ router.post(
         }
       }
 
-      // Parse variants safely
+      // Parse variants
       let parsedVariants = [];
       if (variants) {
         try {
@@ -80,18 +80,19 @@ router.post(
         }
       }
 
-      // Insert into DB (stringify JSON columns!)
+      // Insert into DB
       const result = await pool.query(
         `INSERT INTO elanproducts
-         (name, category, main_image, thumbnails, variants)
-         VALUES ($1,$2,$3,$4,$5)
+         (name, category, main_image, thumbnails, variants, discount)
+         VALUES ($1,$2,$3,$4,$5,$6)
          RETURNING *`,
         [
           name,
           category,
           mainImageUrl,
-          JSON.stringify(thumbnailUrls),    // ✅ stringify thumbnails
-          JSON.stringify(parsedVariants)    // ✅ stringify variants
+          JSON.stringify(thumbnailUrls),
+          JSON.stringify(parsedVariants),
+          Number(discount) || 0 // ✅ save discount
         ]
       );
 
@@ -114,16 +115,16 @@ router.put(
   ]),
   async (req, res) => {
     try {
-      const { name, category, variants, existingMainImage, existingThumbnails } = req.body;
+      const { name, category, variants, existingMainImage, existingThumbnails, discount } = req.body;
 
-      // Handle main image
+      // Main image
       let mainImageUrl = existingMainImage || null;
       if (req.files?.mainImage?.length) {
         const result = await uploadToCloudinary(req.files.mainImage[0].buffer);
         mainImageUrl = result.secure_url;
       }
 
-      // Handle thumbnails
+      // Thumbnails
       let thumbnailUrls = [];
       if (existingThumbnails) {
         try {
@@ -142,7 +143,7 @@ router.put(
         }
       }
 
-      // Parse variants safely
+      // Variants
       let parsedVariants = [];
       if (variants) {
         try {
@@ -158,19 +159,20 @@ router.put(
         }
       }
 
-      // Update DB (stringify JSON columns!)
+      // Update DB
       const result = await pool.query(
         `UPDATE elanproducts
          SET name=$1, category=$2, main_image=$3, thumbnails=$4, variants=$5,
-             updated_at=CURRENT_TIMESTAMP
-         WHERE id=$6
+             discount=$6, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$7
          RETURNING *`,
         [
           name,
           category,
           mainImageUrl,
-          JSON.stringify(thumbnailUrls),    // ✅ stringify
-          JSON.stringify(parsedVariants),   // ✅ stringify
+          JSON.stringify(thumbnailUrls),
+          JSON.stringify(parsedVariants),
+          Number(discount) || 0, // ✅ update discount
           req.params.id
         ]
       );
@@ -182,6 +184,7 @@ router.put(
     }
   }
 );
+
 
 /* ======================================================
    GET ALL PRODUCTS
@@ -207,7 +210,6 @@ router.get("/:id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
-// Reduce product stock
 // routes/products.js
 router.post("/reduce-stock", async (req, res) => {
   try {
