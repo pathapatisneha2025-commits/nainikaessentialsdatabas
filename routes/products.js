@@ -46,7 +46,8 @@ router.post(
   ]),
   async (req, res) => {
     try {
-      const { name, category, variants, discount } = req.body; // ✅ add discount
+      // ✅ Read new fields description & product_details
+      const { name, category, variants, discount, description, product_details } = req.body;
 
       // Upload main image
       let mainImageUrl = null;
@@ -75,16 +76,29 @@ router.post(
             price: Number(v.price) || 0,
             stock: Number(v.stock) || 0,
           }));
-        } catch (err) {
+        } catch {
           parsedVariants = [];
+        }
+      }
+
+      // Parse product_details
+      let parsedProductDetails = {};
+      if (product_details) {
+        try {
+          parsedProductDetails =
+            typeof product_details === "string"
+              ? JSON.parse(product_details)
+              : product_details;
+        } catch {
+          parsedProductDetails = {};
         }
       }
 
       // Insert into DB
       const result = await pool.query(
         `INSERT INTO elanproducts
-         (name, category, main_image, thumbnails, variants, discount)
-         VALUES ($1,$2,$3,$4,$5,$6)
+         (name, category, main_image, thumbnails, variants, discount, description, product_details)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          RETURNING *`,
         [
           name,
@@ -92,7 +106,9 @@ router.post(
           mainImageUrl,
           JSON.stringify(thumbnailUrls),
           JSON.stringify(parsedVariants),
-          Number(discount) || 0 // ✅ save discount
+          Number(discount) || 0,
+          description || "",
+          JSON.stringify(parsedProductDetails)
         ]
       );
 
@@ -103,6 +119,7 @@ router.post(
     }
   }
 );
+
 
 /* ======================================================
    UPDATE PRODUCT
@@ -115,7 +132,8 @@ router.put(
   ]),
   async (req, res) => {
     try {
-      const { name, category, variants, existingMainImage, existingThumbnails, discount } = req.body;
+      // ✅ Read new fields description & product_details
+      const { name, category, variants, existingMainImage, existingThumbnails, discount, description, product_details } = req.body;
 
       // Main image
       let mainImageUrl = existingMainImage || null;
@@ -159,12 +177,25 @@ router.put(
         }
       }
 
+      // Parse product_details
+      let parsedProductDetails = {};
+      if (product_details) {
+        try {
+          parsedProductDetails =
+            typeof product_details === "string"
+              ? JSON.parse(product_details)
+              : product_details;
+        } catch {
+          parsedProductDetails = {};
+        }
+      }
+
       // Update DB
       const result = await pool.query(
         `UPDATE elanproducts
          SET name=$1, category=$2, main_image=$3, thumbnails=$4, variants=$5,
-             discount=$6, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$7
+             discount=$6, description=$7, product_details=$8, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$9
          RETURNING *`,
         [
           name,
@@ -172,7 +203,9 @@ router.put(
           mainImageUrl,
           JSON.stringify(thumbnailUrls),
           JSON.stringify(parsedVariants),
-          Number(discount) || 0, // ✅ update discount
+          Number(discount) || 0,
+          description || "",
+          JSON.stringify(parsedProductDetails),
           req.params.id
         ]
       );
