@@ -15,6 +15,7 @@ router.post("/add", async (req, res) => {
       payment_method,
     } = req.body;
 
+    // 1️⃣ Create the order
     const result = await pool.query(
       `INSERT INTO elan_orders
        (user_id, items, total_amount, order_status, shipping_address, payment_method, created_at)
@@ -23,12 +24,17 @@ router.post("/add", async (req, res) => {
       [user_id, items, total_amount, shipping_address, payment_method]
     );
 
+    // 2️⃣ Clear the user's cart
+    await pool.query(`DELETE FROM elan_cart WHERE user_id = $1`, [user_id]);
+
+    // 3️⃣ Return the order
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("Create order error:", err);
     res.status(500).json({ error: "Failed to create order" });
   }
 });
+
 
 /* =====================================
    2️⃣ GET ALL ORDERS (Admin)
