@@ -30,6 +30,7 @@ const uploadToCloudinary = (buffer, folder = "elanbestsellers") => {
 };
 
 /* ----------------- ADD PRODUCT ----------------- */
+/* ----------------- ADD PRODUCT ----------------- */
 router.post(
   "/add",
   upload.fields([
@@ -38,16 +39,16 @@ router.post(
   ]),
   async (req, res) => {
     try {
-      const { name, category, description, variants, type } = req.body;
+      const { name, category, description, variants, type, discount, product_details } = req.body;
 
-      // main image
+      // Upload main image
       let mainImageUrl = null;
       if (req.files?.mainImage?.length) {
         const result = await uploadToCloudinary(req.files.mainImage[0].buffer);
         mainImageUrl = result.secure_url;
       }
 
-      // thumbnails
+      // Upload thumbnails
       let thumbnailUrls = [];
       if (req.files?.thumbnails?.length) {
         for (const file of req.files.thumbnails) {
@@ -56,7 +57,7 @@ router.post(
         }
       }
 
-      // variants
+      // Parse variants
       let parsedVariants = [];
       if (variants) {
         parsedVariants = typeof variants === "string" ? JSON.parse(variants) : variants;
@@ -68,10 +69,18 @@ router.post(
         }));
       }
 
+      // Parse product_details
+      let parsedDetails = [];
+      if (product_details) {
+        parsedDetails = typeof product_details === "string" ? JSON.parse(product_details) : product_details;
+        parsedDetails = parsedDetails.map(d => ({ label: d.key || "", value: d.value || "" }));
+      }
+
+      // Insert into DB
       const result = await pool.query(
         `INSERT INTO elan_bestsellers
-         (name, category, description, main_image, thumbnails, variants, type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         (name, category, description, main_image, thumbnails, variants, type, discount, product_details)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          RETURNING *`,
         [
           name,
@@ -80,7 +89,9 @@ router.post(
           mainImageUrl,
           JSON.stringify(thumbnailUrls),
           JSON.stringify(parsedVariants),
-          type || "bestseller" // default to bestseller
+          type || "bestseller",
+          Number(discount) || 0,
+          JSON.stringify(parsedDetails)
         ]
       );
 
@@ -101,19 +112,17 @@ router.put(
   ]),
   async (req, res) => {
     try {
-      const { name, category, description, variants, existingMainImage, existingThumbnails, type } = req.body;
+      const { name, category, description, variants, type, discount, existingMainImage, existingThumbnails, product_details } = req.body;
 
+      // Main image
       let mainImageUrl = existingMainImage || null;
       if (req.files?.mainImage?.length) {
         const result = await uploadToCloudinary(req.files.mainImage[0].buffer);
         mainImageUrl = result.secure_url;
       }
 
-      let thumbnailUrls = [];
-      if (existingThumbnails) {
-        thumbnailUrls = typeof existingThumbnails === "string" ? JSON.parse(existingThumbnails) : existingThumbnails;
-      }
-
+      // Thumbnails
+      let thumbnailUrls = existingThumbnails ? (typeof existingThumbnails === "string" ? JSON.parse(existingThumbnails) : existingThumbnails) : [];
       if (req.files?.thumbnails?.length) {
         for (const file of req.files.thumbnails) {
           const result = await uploadToCloudinary(file.buffer);
@@ -121,6 +130,7 @@ router.put(
         }
       }
 
+      // Parse variants
       let parsedVariants = [];
       if (variants) {
         parsedVariants = typeof variants === "string" ? JSON.parse(variants) : variants;
@@ -132,11 +142,19 @@ router.put(
         }));
       }
 
+      // Parse product_details
+      let parsedDetails = [];
+      if (product_details) {
+        parsedDetails = typeof product_details === "string" ? JSON.parse(product_details) : product_details;
+        parsedDetails = parsedDetails.map(d => ({ label: d.key || "", value: d.value || "" }));
+      }
+
+      // Update DB
       const result = await pool.query(
         `UPDATE elan_bestsellers
-         SET name=$1, category=$2, description=$3, main_image=$4, thumbnails=$5, variants=$6, type=$7,
+         SET name=$1, category=$2, description=$3, main_image=$4, thumbnails=$5, variants=$6, type=$7, discount=$8, product_details=$9,
              updated_at=CURRENT_TIMESTAMP
-         WHERE id=$8
+         WHERE id=$10
          RETURNING *`,
         [
           name,
@@ -146,6 +164,8 @@ router.put(
           JSON.stringify(thumbnailUrls),
           JSON.stringify(parsedVariants),
           type || "bestseller",
+          Number(discount) || 0,
+          JSON.stringify(parsedDetails),
           req.params.id
         ]
       );
@@ -157,6 +177,7 @@ router.put(
     }
   }
 );
+
 
 /* ----------------- GET ALL PRODUCTS (OPTIONAL FILTER BY TYPE) ----------------- */
 router.get("/all", async (req, res) => {
