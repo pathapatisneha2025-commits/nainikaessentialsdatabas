@@ -1,7 +1,7 @@
 // contactRoutes.js
 const express = require("express");
 const router = express.Router();
-const pool = require("./db"); // import pool from db.js
+const pool = require("../db");
 
 // Submit Contact Form
 router.post("/contact", async (req, res) => {
