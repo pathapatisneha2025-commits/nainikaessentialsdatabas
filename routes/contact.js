@@ -4,7 +4,7 @@ const router = express.Router();
 const pool = require("../db");
 
 // Submit Contact Form
-router.post("/contact", async (req, res) => {
+router.post("/add", async (req, res) => {
   try {
     const { full_name, email, message } = req.body;
 
