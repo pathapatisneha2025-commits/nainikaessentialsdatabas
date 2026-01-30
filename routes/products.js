@@ -292,5 +292,62 @@ router.delete("/delete/:id", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+router.post("/:id/review", async (req, res) => {
+  try {
+    const { name, rating, comment } = req.body;
+
+    if (!name || !rating || !comment) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const result = await pool.query(
+      "SELECT reviews FROM elanproducts WHERE id=$1",
+      [req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    let reviews = result.rows[0].reviews || [];
+
+    const newReview = {
+      name,
+      rating: Number(rating),
+      comment,
+      date: new Date()
+    };
+
+    reviews.push(newReview);
+
+    await pool.query(
+      "UPDATE elanproducts SET reviews=$1 WHERE id=$2",
+      [JSON.stringify(reviews), req.params.id]
+    );
+
+    res.json({ success: true, review: newReview });
+  } catch (err) {
+    console.error("Add review error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+router.get("/:id/reviews", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT reviews FROM elanproducts WHERE id=$1",
+      [req.params.id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    res.json(result.rows[0].reviews || []);
+  } catch (err) {
+    console.error("Get reviews error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 
 module.exports = router;
