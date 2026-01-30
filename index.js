@@ -7,6 +7,7 @@ const OrdersRoutes = require("./routes/orders");
 const couponsRoutes = require("./routes/coupons");
 const codRoutes = require("./routes/cod");
 const BestRoutes = require("./routes/bestsellers");
+const ContactRoutes = require("./routes/contact");
 
 
 
@@ -22,6 +23,7 @@ app.use("/orders",OrdersRoutes);
 app.use("/coupons",couponsRoutes);
 app.use("/cod",codRoutes);
 app.use("/bestseller",BestRoutes);
+app.use("/contact",ContactRoutes);
 
 
 // Test Route
