@@ -359,6 +359,31 @@ router.post("/admin/returns/:order_id", async (req, res) => {
   }
 });
 
+/* =====================================
+   GET GUEST ORDERS BY MOBILE
+===================================== */
+router.get("/guest/:mobile", async (req, res) => {
+  try {
+    const { mobile } = req.params;
+
+    // Fetch orders where shipping_address JSON contains the mobile
+    const result = await pool.query(
+      `SELECT * FROM elan_orders 
+       WHERE shipping_address->>'phone' = $1
+       ORDER BY created_at DESC`,
+      [mobile]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, message: "No orders found for this mobile number" });
+    }
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Fetch guest orders error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
 
 
