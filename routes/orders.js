@@ -403,47 +403,60 @@ router.get("/admin/returns", async (req, res) => {
 
 
 // APPROVE / REJECT RETURN (Admin)
-router.post("/admin/returns/:order_id", async (req, res) => {
-  const { order_id } = req.params;
-  const { action } = req.body; // action = "approve" | "reject"
+router.post("/admin/returns/:orderId", async (req, res) => {
+  const { orderId } = req.params;
+  const { action } = req.body; // approve | reject
 
   if (!["approve", "reject"].includes(action)) {
-    return res.status(400).json({ success: false, message: "Invalid action" });
+    return res.status(400).json({
+      success: false,
+      message: "Invalid action",
+    });
   }
 
   try {
-    // Fetch the order
+    // ✅ FIX: use id
     const orderResult = await pool.query(
-      "SELECT items FROM elan_orders WHERE order_id = $1",
-      [order_id]
+      "SELECT items FROM elan_orders WHERE id = $1",
+      [orderId]
     );
 
     if (!orderResult.rows.length) {
-      return res.status(404).json({ success: false, message: "Order not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
     }
 
     let items = orderResult.rows[0].items;
-    if (typeof items === "string") items = JSON.parse(items);
 
-    // Update return_status for all items
-    items = items.map(item => ({
+    if (typeof items === "string") {
+      items = JSON.parse(items);
+    }
+
+    // update return status
+    items = items.map((item) => ({
       ...item,
-      return_status: action === "approve" ? "Approved" : "Rejected"
+      return_status:
+        action === "approve" ? "Approved" : "Rejected",
     }));
 
-    // Update DB
+    // ✅ FIX: update using id
     await pool.query(
-      "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
-      [JSON.stringify(items), order_id]
+      "UPDATE elan_orders SET items = $1 WHERE id = $2",
+      [JSON.stringify(items), orderId]
     );
 
     res.json({
       success: true,
-      message: `All returns in Order #${order_id} have been ${action}d successfully`
+      message: `All returns in Order #${orderId} have been ${action}d successfully`,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
