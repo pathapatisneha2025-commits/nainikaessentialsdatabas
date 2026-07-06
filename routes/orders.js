@@ -336,39 +336,52 @@ router.get("/sales", async (req, res) => {
 // REQUEST RETURN (User)
 router.post("/:orderId/return", async (req, res) => {
   const { orderId } = req.params;
-  const { reason } = req.body; // no product_ids needed
+  const { reason } = req.body;
 
   try {
-    // Fetch the order
+    // ✅ FIX: use id instead of order_id
     const orderResult = await pool.query(
-      "SELECT items FROM elan_orders WHERE order_id = $1",
+      "SELECT items FROM elan_orders WHERE id = $1",
       [orderId]
     );
 
-    if (!orderResult.rows.length)
-      return res.status(404).json({ success: false, message: "Order not found" });
+    if (!orderResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
 
     let items = orderResult.rows[0].items;
 
-    if (typeof items === "string") items = JSON.parse(items);
+    if (typeof items === "string") {
+      items = JSON.parse(items);
+    }
 
-    // Update all items
-    items = items.map(item => ({
+    // update all items
+    items = items.map((item) => ({
       ...item,
       return_status: "Requested",
-      return_reason: reason
+      return_reason: reason,
     }));
 
-    // Update DB
+    // ✅ FIX: update using id
     await pool.query(
-      "UPDATE elan_orders SET items = $1 WHERE order_id = $2",
+      "UPDATE elan_orders SET items = $1 WHERE id = $2",
       [JSON.stringify(items), orderId]
     );
 
-    res.json({ success: true, message: "Return requested for entire order", items });
+    res.json({
+      success: true,
+      message: "Return requested for entire order",
+      items,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
