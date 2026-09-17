@@ -76,15 +76,37 @@ router.post("/add", async (req, res) => {
         ? "pending"
         : payment_status || "pending";
 
-    // Generate next order_id
-    const orderIdResult = await pool.query(
-      `SELECT COALESCE(MAX(order_id), 0) + 1 AS next_order_id
-       FROM elan_orders`
-    );
+    // =====================================================
+    // GENERATE NEXT ORDER ID
+    // Example: ORD1001, ORD1002, ORD1003...
+    // =====================================================
 
-    const order_id = orderIdResult.rows[0].next_order_id;
+    const orderIdResult = await pool.query(`
+      SELECT
+        COALESCE(
+          MAX(
+            CASE
+              WHEN order_id ~ '^ORD[0-9]+$'
+              THEN CAST(SUBSTRING(order_id FROM 4) AS INTEGER)
+              ELSE 0
+            END
+          ),
+          0
+        ) + 1 AS next_order_number
+      FROM elan_orders
+    `);
 
-    // Create order
+    const nextOrderNumber =
+      orderIdResult.rows[0].next_order_number;
+
+    const order_id = `ORD${nextOrderNumber}`;
+
+    console.log("Generated order ID:", order_id);
+
+    // =====================================================
+    // CREATE ORDER
+    // =====================================================
+
     const result = await pool.query(
       `INSERT INTO elan_orders
        (
@@ -122,13 +144,23 @@ router.post("/add", async (req, res) => {
       ]
     );
 
-    // Clear cart
-    if (finalPaymentStatus === "paid" || payment_method === "cod") {
+    // =====================================================
+    // CLEAR CART
+    // =====================================================
+
+    if (
+      finalPaymentStatus === "paid" ||
+      payment_method === "cod"
+    ) {
       await pool.query(
         `DELETE FROM elan_cart WHERE user_id = $1`,
         [user_id]
       );
     }
+
+    // =====================================================
+    // RESPONSE
+    // =====================================================
 
     res.status(201).json(result.rows[0]);
 
