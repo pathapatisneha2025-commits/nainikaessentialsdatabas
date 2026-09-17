@@ -72,18 +72,47 @@ router.post("/add", async (req, res) => {
 
     // Auto set payment status
     const finalPaymentStatus =
-      payment_method === "cod" ? "pending" : payment_status || "pending";
+      payment_method === "cod"
+        ? "pending"
+        : payment_status || "pending";
 
-    // 1️⃣ Create order
+    // Generate next order_id
+    const orderIdResult = await pool.query(
+      `SELECT COALESCE(MAX(order_id), 0) + 1 AS next_order_id
+       FROM elan_orders`
+    );
+
+    const order_id = orderIdResult.rows[0].next_order_id;
+
+    // Create order
     const result = await pool.query(
       `INSERT INTO elan_orders
-       (user_id, items, total_amount, order_status,
-        shipping_address, payment_method,
-        payment_status, created_at)
-       VALUES ($1, $2, $3, 'Pending',
-               $4, $5, $6, NOW())
+       (
+         order_id,
+         user_id,
+         items,
+         total_amount,
+         order_status,
+         shipping_address,
+         payment_method,
+         payment_status,
+         created_at
+       )
+       VALUES
+       (
+         $1,
+         $2,
+         $3,
+         $4,
+         'Pending',
+         $5,
+         $6,
+         $7,
+         NOW()
+       )
        RETURNING *`,
       [
+        order_id,
         user_id,
         items,
         total_amount,
@@ -93,7 +122,7 @@ router.post("/add", async (req, res) => {
       ]
     );
 
-    // 2️⃣ Clear cart
+    // Clear cart
     if (finalPaymentStatus === "paid" || payment_method === "cod") {
       await pool.query(
         `DELETE FROM elan_cart WHERE user_id = $1`,
@@ -105,7 +134,11 @@ router.post("/add", async (req, res) => {
 
   } catch (err) {
     console.error("Create order error:", err);
-    res.status(500).json({ error: "Failed to create order" });
+
+    res.status(500).json({
+      error: "Failed to create order",
+      message: err.message
+    });
   }
 });
 
